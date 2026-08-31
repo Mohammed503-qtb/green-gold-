@@ -176,14 +176,17 @@ jobs:
       - name: تجهيز Buildx (لدعم كاش البناء)
         uses: docker/setup-buildx-action@v3
 
+      - name: تجهيز اسم الصورة (بأحرف صغيرة — شرط GHCR)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/green-gold" >> "$GITHUB_ENV"
+
       - name: بناء الصورة ودفعها
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/green-gold:${{ env.VERSION }}
-            ghcr.io/${{ github.repository_owner }}/green-gold:latest
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
