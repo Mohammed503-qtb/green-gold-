@@ -96,6 +96,29 @@ jobs:
           if [ -n "$API_BASE_URL" ]; then ARGS="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
           flutter build appbundle --release $ARGS
 
+      - name: 🛡️ فحص سلامة الحزمة (منع كراش الإقلاع)
+        working-directory: mobile
+        run: |
+          set -e
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          echo "── 1) فحص الصلاحيات ──"
+          AAPT2=$(find /usr/local/lib/android/sdk/build-tools -name aapt2 | sort -V | tail -1)
+          "$AAPT2" dump permissions "$APK" | tee /tmp/perms.txt
+          grep -q "android.permission.INTERNET" /tmp/perms.txt \
+            || { echo "❌ صلاحية INTERNET مفقودة — التطبيق لن يتصل بالخادم!"; exit 1; }
+          echo "✅ صلاحية الإنترنت موجودة"
+          echo "── 2) فحص فئة MainActivity داخل dex ──"
+          rm -rf /tmp/apkcheck && mkdir -p /tmp/apkcheck
+          unzip -o -q "$APK" 'classes*.dex' -d /tmp/apkcheck
+          if strings /tmp/apkcheck/classes*.dex | grep -q "Lye/greengold/app/MainActivity;"; then
+            echo "✅ MainActivity موجودة في الحزمة الصحيحة ye.greengold.app"
+          else
+            echo "❌ MainActivity غير موجودة في ye.greengold.app — سيسبب كراشًا فوريًا عند الفتح!"
+            exit 1
+          fi
+          echo "── 3) فحص بنية Manifest للنشاط الرئيسي ──"
+          "$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" | grep -A2 "activity" | head -20 || true
+
       - name: تسمية الحزم
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk "GreenGold-${VERSION}-android.apk"

@@ -76,3 +76,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# ملفات مرفوعة من المحادثة
+upload/

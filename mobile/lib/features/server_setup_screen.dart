@@ -225,7 +225,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
                   ),
                   const SizedBox(height: 18),
                   const Text(
-                    'الإصدار 1.0.0 — ذهب أخضر للتجارة',
+                    'الإصدار 1.0.1 — ذهب أخضر للتجارة',
                     style: TextStyle(color: Color(0xFF7B9C87), fontSize: 12),
                   ),
                 ],

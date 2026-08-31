@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- صلاحية الإنترنت إلزامية في نسخة الإصدار: التطبيق يتصل بخادم الـ API
+         ويحمّل صور الدفعات من الـ CDN (في debug/profile توفر تلقائيًا فقط!) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- حالة الشبكة لعرض رسائل واضحة عند انقطاع الاتصال -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
         android:label="ذهب أخضر"
         android:name="${applicationName}"
