@@ -1,11 +1,16 @@
 // ============================================================
 // GREEN GOLD | إعدادات التطبيق — عنوان خادم الـ API
 // الأولوية: المحفوظ في الجهاز ← قيمة وقت البناء (dart-define)
-// إن لم يوجد أي عنوان → شاشة إعداد الخادم
+//            ← الخادم الرسمي المضمّن في الشيفرة
+// الخادم الرسمي مضبوط مسبقًا: التطبيق يعمل مباشرة بعد التثبيت
+// دون أي إعداد. الإدارة وحدها تستطيع تغييره من داخل الإدارة.
 // ============================================================
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// الخادم الرسمي لذهب أخضر — مضمّن في الشيفرة (نسخة جاهزة للعمل فورًا)
+const String kBakedApiUrl = 'https://e10cs7pn37s0-d.space-z.ai';
 
 /// العنوان المضمّن وقت البناء: --dart-define=API_BASE_URL=https://...
 const String kCompileTimeApiUrl = String.fromEnvironment('API_BASE_URL');
@@ -21,6 +26,8 @@ class AppConfig {
     if (stored.isNotEmpty) return stored;
     final compile = kCompileTimeApiUrl.trim();
     if (compile.isNotEmpty) return compile;
+    final baked = kBakedApiUrl.trim();
+    if (baked.isNotEmpty) return baked;
     return '';
   }
 

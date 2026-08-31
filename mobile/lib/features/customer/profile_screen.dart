@@ -66,7 +66,7 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 6),
                     const Text(
-                      'ذهب أخضر — الإصدار 1.0.2',
+                      'ذهب أخضر — الإصدار 1.0.3',
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
                     ),
                   ],
