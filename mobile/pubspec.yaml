@@ -1,0 +1,75 @@
+name: green_gold
+description: "ذهب أخضر — قات اليوم في عدن. تطبيق الطلب والدفع والتوصيل بإثبات الدفع وOTP."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+
+  # إدارة الحالة
+  flutter_riverpod: ^2.6.1
+
+  # الشبكة
+  dio: ^5.7.0
+
+  # الصور
+  cached_network_image: ^3.4.1
+
+  # التخزين المحلي
+  shared_preferences: ^2.3.2
+
+  # واتساب والروابط الخارجية
+  url_launcher: ^6.3.1
+
+  # التقاط صورة إثبات الدفع
+  image_picker: ^1.1.2
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.2
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0B3D20"
+  adaptive_icon_foreground: "assets/icon/app_icon_fg.png"
+
+flutter_native_splash:
+  color: "#0B3D20"
+  image: assets/icon/splash_logo.png
+  android_12:
+    color: "#0B3D20"
+    image: assets/icon/splash_logo.png
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/fonts/
+    - assets/icon/
+
+  fonts:
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Tajawal-ExtraBold.ttf
+          weight: 800

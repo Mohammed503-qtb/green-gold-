@@ -1,0 +1,49 @@
+# ============================================================
+# ذهب أخضر — فحص جودة مستمر (CI)
+# يعمل مع كل دفعة إلى main وكل Pull Request
+# ============================================================
+name: 🔍 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  flutter-analyze:
+    name: فحص تطبيق Flutter
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: تحميل الحزم
+        run: flutter pub get
+
+      - name: الفحص الساكن (analyze)
+        run: flutter analyze --no-fatal-infos
+
+  backend-check:
+    name: فحص الباكند
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: تثبيت الحزم
+        run: bun install --frozen-lockfile
+
+      - name: توليد عميل Prisma
+        run: bunx prisma generate
+
+      - name: فحص Lint
+        run: bun run lint

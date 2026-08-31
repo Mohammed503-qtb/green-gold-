@@ -1,0 +1,306 @@
+// GREEN GOLD — ذهب أخضر
+// نظام كامل: دفعات ← مخزون ← طلبات ← دفع ← تحقق ← تجهيز ← توصيل ← تسليم ← تقييم
+// ملاحظة: SQLite لا يدعم Enums في Prisma → كل الحالات نصية مع تحقق في الكود
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── الإدارة والصلاحيات ─────────────────────────
+
+model StaffUser {
+  id        String   @id @default(cuid())
+  name      String
+  pin       String   @unique
+  role      String // OWNER | MANAGER | STAFF | DELIVERY
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorName  String
+  actorRole  String
+  action     String // PRICE_CHANGED | PAYMENT_VERIFIED | ORDER_STATUS | BATCH_CREATED ...
+  entityType String // ORDER | BATCH | PAYMENT | DELIVERY | SETTING
+  entityId   String
+  before     String? // JSON snapshot
+  after      String? // JSON snapshot
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ───────────────────────── العملاء والعناوين ─────────────────────────
+
+model Customer {
+  id        String    @id @default(cuid())
+  phone     String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  addresses Address[]
+  orders    Order[]
+  reviews   Review[]
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  customerId String
+  customer  Customer @relation(fields: [customerId], references: [id])
+  label     String // المنزل | العمل | عنوان آخر
+  zoneId    String
+  zone      DeliveryZone @relation(fields: [zoneId], references: [id])
+  addressText String
+  notes     String?
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model DeliveryZone {
+  id        String  @id @default(cuid())
+  name      String
+  fee       Int
+  active    Boolean @default(true)
+  addresses Address[]
+  orders    Order[]
+}
+
+// ───────────────────────── المنتجات والدفعات ─────────────────────────
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String // حراز، حمادي، العنسي ...
+  origin      String? // مكان المنشأ
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  batches     ProductBatch[]
+}
+
+model ProductBatch {
+  id          String   @id @default(cuid())
+  batchCode   String   @unique // HZ-20260904-01
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  grade       String // PREMIUM | EXCELLENT | ECONOMIC
+  price       Int // ريال يمني / حزمة
+  totalQty    Int
+  reservedQty Int      @default(0)
+  soldQty     Int      @default(0)
+  cancelledQty Int     @default(0)
+  status      String   @default("ACTIVE") // ACTIVE | HIDDEN | CLOSED | SOLD_OUT
+  capturedAt  DateTime // وقت تصوير الدفعة الحقيقية
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  media       BatchMedia[]
+  quality     BatchQuality?
+  orderItems  OrderItem[]
+  reservations InventoryReservation[]
+  movements   InventoryMovement[]
+  reviews     Review[]
+
+  @@index([status, grade])
+}
+
+model BatchMedia {
+  id      String  @id @default(cuid())
+  batchId String
+  batch   ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  url     String
+  type    String  @default("IMAGE") // IMAGE | VIDEO
+  isMain  Boolean @default(false)
+  sort    Int     @default(0)
+}
+
+model BatchQuality {
+  id        String @id @default(cuid())
+  batchId   String @unique
+  batch     ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  freshness Int // 1-10 النضارة
+  density   Int // 1-10 الكثافة
+  fullness  Int // 1-10 الامتلاء
+  appearance Int // 1-10 المظهر العام
+}
+
+// ───────────────────────── المخزون ─────────────────────────
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  batchId   String
+  batch     ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  qty       Int // موجب/سالب
+  type      String // ADD | RESERVE | RELEASE | SOLD | CANCEL | ADJUST
+  orderId   String?
+  note      String?
+  actor     String   @default("SYSTEM")
+  createdAt DateTime @default(now())
+
+  @@index([batchId])
+  @@index([createdAt])
+}
+
+model InventoryReservation {
+  id        String   @id @default(cuid())
+  batchId   String
+  batch     ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  qty       Int
+  status    String   @default("ACTIVE") // ACTIVE | CONSUMED | RELEASED
+  expiresAt DateTime // مهلة الدفع
+  createdAt DateTime @default(now())
+
+  @@index([status, expiresAt])
+}
+
+// ───────────────────────── الطلبات ─────────────────────────
+
+model Order {
+  id          String   @id @default(cuid())
+  orderCode   String   @unique // ZG-482731
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  status      String   @default("PENDING_PAYMENT")
+  itemsTotal  Int
+  deliveryFee Int
+  discount    Int      @default(0)
+  total       Int
+  zoneId      String?
+  zone        DeliveryZone? @relation(fields: [zoneId], references: [id])
+  addressText String
+  customerName String
+  phone       String
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       OrderItem[]
+  history     OrderStatusHistory[]
+  payments    Payment[]
+  delivery    DeliveryOrder?
+  reservation InventoryReservation?
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  batchId     String
+  batch       ProductBatch @relation(fields: [batchId], references: [id])
+  // لقطات لحظة الشراء — هذه هي الحقيقة التي رآها العميل
+  productName String
+  batchCode   String
+  grade       String
+  unitPrice   Int
+  qty         Int
+  lineTotal   Int
+  mainImage   String?
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actor      String // CUSTOMER | اسم الموظف | SYSTEM
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// ───────────────────────── الدفع ─────────────────────────
+
+model PaymentMethod {
+  id            String @id @default(cuid())
+  name          String
+  type          String // BANK | WALLET | COD
+  accountName   String?
+  institution   String?
+  accountNumber String?
+  instructions  String?
+  active        Boolean @default(true)
+  sort          Int    @default(0)
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  methodId       String?
+  methodSnapshot String // JSON { name, type, accountName... }
+  amount         Int
+  status         String   @default("UNPAID") // UNPAID | PENDING_VERIFICATION | PAID | REJECTED | REFUNDED
+  transactionRef String?
+  proofUrl       String?
+  submittedAt    DateTime?
+  verifiedAt     DateTime?
+  verifiedBy     String?
+  rejectReason   String?
+  createdAt      DateTime @default(now())
+
+  @@index([status])
+}
+
+// ───────────────────────── التوصيل ─────────────────────────
+
+model DeliveryOrder {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverName   String?
+  status       String   @default("WAITING") // WAITING | ASSIGNED | PICKED_UP | OUT_FOR_DELIVERY | DELIVERED | FAILED
+  otp          String? // رمز تسليم 4 أرقام
+  otpVerifiedAt DateTime?
+  assignedAt   DateTime?
+  deliveredAt  DateTime?
+  failReason   String?
+  createdAt    DateTime @default(now())
+
+  @@index([status])
+}
+
+// ───────────────────────── التقييم والإشعارات ─────────────────────────
+
+model Review {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  batchId       String
+  batch         ProductBatch @relation(fields: [batchId], references: [id])
+  rating        Int // 1-5
+  smiley        String // LOVE | GOOD | OK | BAD
+  matchedPhotos Boolean?
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@index([batchId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  audience  String   @default("ADMIN") // ADMIN | CUSTOMER
+  title     String
+  body      String
+  orderCode String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([audience, read])
+}
+
+model Setting {
+  key   String @id
+  value String // JSON
+}

@@ -1,0 +1,78 @@
+# ============================================================
+# GREEN GOLD | ذهب أخضر — .gitignore
+# ============================================================
+
+# ─── Node / Next.js (الباكند + الويب) ───
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel/
+
+# ─── البيانات التشغيلية (لا تُرفع للمستودع) ───
+db/*.db
+db/*.db-journal
+*.sqlite
+
+# ─── البيئة والأسرار ───
+.env
+.env.*
+!.env.example
+
+# ─── سجلات ───
+*.log
+dev.log
+
+# ─── بنية البيئة الرملية الداخلية (خارج نطاق المستودع) ───
+agent-ctx/
+AGENTS_SPEC.md
+AGENT_A_SPEC.md
+AGENT_B_SPEC.md
+worklog.md
+download/
+tests/
+examples/
+mini-services/
+Caddyfile
+skills/
+tool-results/
+.zscripts/
+.claude/
+.zai/
+.cursors/
+green_gold.iml
+
+# ─── Flutter / mobile ───
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.idea/
+mobile/.vscode/
+mobile/coverage/
+mobile/lib/generated_plugin_registrant.dart
+
+# Android
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/*.jks
+mobile/android/app/*.keystore
+mobile/android/app/release.keystore
+mobile/android/.cxx/
+
+# iOS
+mobile/ios/Pods/
+mobile/ios/.symlink/
+mobile/ios/Flutter/ephemeral
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/ios/ServiceDefinitions.json
+mobile/ios/Runner/GeneratedPluginRegistrant.*
+
+# ─── أنظمة التشغيل والمحررات ───
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

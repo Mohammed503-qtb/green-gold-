@@ -1,0 +1,255 @@
+# ============================================================
+# ذهب أخضر — خط بناء الإصدارات التجارية
+# يعمل عند دفع وسم v* أو يدويًا (Run workflow)
+#
+# ينتج ويُصدر في GitHub Releases:
+#   • GreenGold-<v>-android.apk  — حزمة موقّعة للتثبيت المباشر
+#   • GreenGold-<v>-android.aab  — حزمة متجر Google Play
+#   • GreenGold-<v>-ios-unsigned.ipa — حزمة iOS للتوقيع بحسابك
+#   • checksums.txt — بصمات SHA-256
+#   + صورة Docker للباكند على GHCR (ghcr.io/mohammed503-qtb/green-gold)
+#
+# الأسرار المطلوبة (Settings → Secrets → Actions):
+#   ANDROID_KEYSTORE_BASE64     — ملف الـ keystore مشفرًا base64
+#   ANDROID_KEYSTORE_PASSWORD   — كلمة مرور المخزن
+#   ANDROID_KEY_ALIAS           — اسم المفتاح
+#   ANDROID_KEY_PASSWORD        — كلمة مرور المفتاح
+#
+# متغير اختياري (Settings → Variables):
+#   API_BASE_URL — عنوان خادم الـ API المضمّن في التطبيق وقت البناء
+# ============================================================
+name: 🚀 Release Build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'رقم الإصدار (مثل v1.0.1)'
+        required: true
+        default: 'v1.0.0'
+      api_base_url:
+        description: 'عنوان خادم الـ API المضمّن (اختياري — مثل https://api.example.com)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────
+  build-android:
+    name: 🤖 بناء Android موقّع
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+      API_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.api_base_url || vars.API_BASE_URL }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: تحميل الحزم
+        run: flutter pub get
+
+      - name: الفحص الساكن
+        run: flutter analyze --no-fatal-infos
+
+      - name: تجهيز مفتاح توقيع الإصدار
+        working-directory: mobile/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release-keystore.jks
+          {
+            echo "storeFile=release-keystore.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > key.properties
+
+      - name: بناء APK موقّع (للتثبيت المباشر)
+        run: |
+          ARGS=""
+          if [ -n "$API_BASE_URL" ]; then ARGS="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
+          flutter build apk --release $ARGS
+
+      - name: بناء AAB موقّع (متجر Google Play)
+        run: |
+          ARGS=""
+          if [ -n "$API_BASE_URL" ]; then ARGS="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
+          flutter build appbundle --release $ARGS
+
+      - name: تسمية الحزم
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk "GreenGold-${VERSION}-android.apk"
+          mv build/app/outputs/bundle/release/app-release.aab "GreenGold-${VERSION}-android.aab"
+
+      - name: رفع مخرجات البناء
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: |
+            mobile/GreenGold-*-android.apk
+            mobile/GreenGold-*-android.aab
+          if-no-files-found: error
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────
+  build-ios:
+    name: 🍎 بناء iOS
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+      API_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.api_base_url || vars.API_BASE_URL }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: تحميل الحزم
+        run: flutter pub get
+
+      - name: بناء أرشيف iOS (بدون توقيع — يُوقَّع لاحقًا بحساب Apple Developer)
+        run: |
+          ARGS=""
+          if [ -n "$API_BASE_URL" ]; then ARGS="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
+          flutter build ipa --release --no-codesign $ARGS
+
+      - name: تجهيز حزمة IPA غير موقّعة
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -R build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qry "GreenGold-${VERSION}-ios-unsigned.ipa" Payload
+          mv "GreenGold-${VERSION}-ios-unsigned.ipa" ../../..
+
+      - name: رفع مخرجات البناء
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-artifacts
+          path: mobile/GreenGold-*-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────
+  build-docker:
+    name: 🐳 صورة Docker للباكند (GHCR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تسجيل الدخول إلى GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: بناء الصورة ودفعها
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/green-gold:${{ env.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/green-gold:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────
+  release:
+    name: 📦 نشر الإصدار
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تنزيل مخرجات Android
+        uses: actions/download-artifact@v4
+        with:
+          name: android-artifacts
+          path: dist
+
+      - name: تنزيل مخرجات iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-artifacts
+          path: dist
+
+      - name: توليد بصمات SHA-256
+        working-directory: dist
+        run: |
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: إنشاء الإصدار
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: ذهب أخضر ${{ env.VERSION }} 🌿
+          body: |
+            # ذهب أخضر — ${{ env.VERSION }}
+
+            **قات اليوم في عدن — بشوف ما بتستلمه قبل ما تدفع** 🌿
+
+            ## 📱 ملفات التثبيت
+
+            | الملف | الاستخدام |
+            |---|---|
+            | `GreenGold-${{ env.VERSION }}-android.apk` | تثبيت مباشر على أي جهاز Android — حمّله وافتحه (فعّل «التثبيت من مصادر غير معروفة») |
+            | `GreenGold-${{ env.VERSION }}-android.aab` | رفع على متجر Google Play (Console → Production → Create release) |
+            | `GreenGold-${{ env.VERSION }}-ios-unsigned.ipa` | يُوقَّع بحساب Apple Developer ثم الرفع عبر Transporter/TestFlight |
+
+            ## ✨ ما الجديد
+
+            - الإصدار الأول: المتجر بالدفعات الحقيقية (صور وفيديو لكل دفعة)
+            - سلة مشتريات + شراء محمي (الخادم يعيد حساب الأسعار)
+            - دفع بإثبات (بنكي/محفظة/عند الاستلام) مع تحقق يدوي من الإدارة
+            - تتبع الطلب خطوة بخطوة + رمز OTP للتسليم
+            - تقييم مرتبط بالدفعات + إعادة الطلب بضغطة
+            - واتساب برقم الطلب + إدارة كاملة (لوحة/طلبات/دفعات/مخزون/توصيل/تقارير)
+            - إعدادات خادم مرنة عند أول تشغيل
+
+            ## 🔗 الخادم
+
+            التطبيق يتصل بخادم ذهب أخضر. عند أول تشغيل أدخل عنوان الخادم، أو ابنِ التطبيق بعنوان مضمّن:
+            `--dart-define=API_BASE_URL=https://your-server.com`
+
+            الباكند جاهز للنشر عبر Docker: `docker run -p 3000:3000 -v gg-data:/app/db ghcr.io/mohammed503-qtb/green-gold:latest`
+
+            > تحقق من سلامة الملفات بمقارنة `checksums.txt` (SHA-256).
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
