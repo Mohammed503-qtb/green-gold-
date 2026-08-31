@@ -32,9 +32,12 @@ class NetImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
-      memCacheWidth: 900,
+      // فك ترميز بأقصى 600px — ذاكرة أقل وأداء أسرع على الأجهزة المتوسطة
+      memCacheWidth: 600,
+      maxWidthDiskCache: 900,
+      fadeInDuration: const Duration(milliseconds: 180),
       placeholder: (_, _) => Container(
-        color: Colors.grey.shade100,
+        color: const Color(0xFFEDF3EE),
         child: const Center(
           child: SizedBox(
             width: 26,
@@ -364,6 +367,55 @@ Future<void> launchExternal(BuildContext context, String url) async {
 // ───────── مؤقتات ─────────
 
 /// مؤقت تحديث دوري (لطلبات العميل ولوحة الإدارة)
+/// 30 ثانية بدل 15 — يقلل الضغط على الشبكة الضعيفة
 final autoRefreshTickerProvider = StreamProvider<int>((ref) {
-  return Stream<int>.periodic(const Duration(seconds: 15), (i) => i);
+  return Stream<int>.periodic(const Duration(seconds: 30), (i) => i);
 });
+
+// ───────── منطقة النقر السرية (دخول الإدارة المخفي) ─────────
+
+/// تُغلِّف أي عنصر وتطلق [onTriggered] بعد نقرات متقاربة (5 افتراضيًا).
+/// تُستخدم لإخفاء مداخل الإدارة عن المستخدمين العاديين —
+/// لا شيء يظهر في الواجهة، والوصول عبر نمط نقر يعرفه المدير فقط.
+class SecretTapArea extends StatefulWidget {
+  final int taps;
+  final Duration window;
+  final VoidCallback onTriggered;
+  final Widget child;
+
+  const SecretTapArea({
+    super.key,
+    required this.onTriggered,
+    required this.child,
+    this.taps = 5,
+    this.window = const Duration(seconds: 6),
+  });
+
+  @override
+  State<SecretTapArea> createState() => _SecretTapAreaState();
+}
+
+class _SecretTapAreaState extends State<SecretTapArea> {
+  int _count = 0;
+  DateTime _last = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void _tap() {
+    final now = DateTime.now();
+    if (now.difference(_last) > widget.window) _count = 0;
+    _last = now;
+    _count++;
+    if (_count >= widget.taps) {
+      _count = 0;
+      widget.onTriggered();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _tap,
+      behavior: HitTestBehavior.opaque,
+      child: widget.child,
+    );
+  }
+}

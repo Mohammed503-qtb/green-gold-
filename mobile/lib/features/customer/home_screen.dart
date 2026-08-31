@@ -12,6 +12,7 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../models/batch.dart';
+import '../../services/api_cache.dart';
 import '../../services/customer_services.dart';
 import '../../shared/widgets.dart';
 import '../../state/cart.dart';
@@ -49,6 +50,9 @@ class HomeCatalogState {
   final int? availableCount;
   final List<String> cartNotices;
 
+  /// يظهر عندما نعرض بيانات محفوظة والشبكة مقطوعة
+  final bool offline;
+
   const HomeCatalogState({
     required this.segment,
     this.search = '',
@@ -58,6 +62,7 @@ class HomeCatalogState {
     this.lastUpdated,
     this.availableCount,
     this.cartNotices = const [],
+    this.offline = false,
   });
 
   static const Object _unset = Object();
@@ -71,6 +76,7 @@ class HomeCatalogState {
     DateTime? lastUpdated,
     int? availableCount,
     List<String>? cartNotices,
+    bool? offline,
   }) {
     return HomeCatalogState(
       segment: segment ?? this.segment,
@@ -81,6 +87,7 @@ class HomeCatalogState {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       availableCount: availableCount ?? this.availableCount,
       cartNotices: cartNotices ?? this.cartNotices,
+      offline: offline ?? this.offline,
     );
   }
 }
@@ -129,7 +136,36 @@ class HomeCatalogController extends StateNotifier<HomeCatalogState> {
     final token = ++_token;
     final seg = state.segment;
     final search = state.search.trim();
-    state = state.copyWith(loading: true, error: null);
+
+    // ── 1) عرض الكاش فورًا إن وُجد (تجربة فورية على الشبكة الضعيفة) ──
+    final hasData = state.batches.isNotEmpty;
+    if (hasData) {
+      state = state.copyWith(loading: true, error: null);
+    } else {
+      final cached = await _catalog.cachedCatalog(
+        grade: seg.grade,
+        search: search.isEmpty ? null : search,
+        sort: seg.sort,
+      );
+      if (token != _token) return;
+      if (cached != null && cached.isNotEmpty) {
+        final t = await ApiCache.I.readTime(catalogCacheKey(
+          grade: seg.grade,
+          search: search.isEmpty ? null : search,
+          sort: seg.sort,
+        ));
+        state = state.copyWith(
+          batches: cached,
+          loading: true,
+          error: null,
+          lastUpdated: t,
+        );
+      } else {
+        state = state.copyWith(loading: true, error: null);
+      }
+    }
+
+    // ─ـ 2) جلب الشبكة في الخلفية — تحديث أو بقاء الكاش عند الفشل ──
     try {
       final batches = await _catalog.fetchCatalog(
         grade: seg.grade,
@@ -141,6 +177,7 @@ class HomeCatalogController extends StateNotifier<HomeCatalogState> {
         batches: batches,
         loading: false,
         lastUpdated: DateTime.now(),
+        offline: false,
       );
       // التحقق من السلة يتم دائمًا مقابل الكتالوج الكامل غير المُفلتر
       if (seg.grade == null && search.isEmpty) {
@@ -150,10 +187,20 @@ class HomeCatalogController extends StateNotifier<HomeCatalogState> {
       }
     } on ApiException catch (e) {
       if (token != _token) return;
-      state = state.copyWith(loading: false, error: e.message);
+      if (state.batches.isNotEmpty) {
+        // عندنا بيانات محفوظة معروضة → نُبقيها ونعلّم وضع عدم الاتصال
+        state = state.copyWith(loading: false, error: null, offline: true);
+      } else {
+        state = state.copyWith(loading: false, error: e.message);
+      }
     } catch (_) {
       if (token != _token) return;
-      state = state.copyWith(loading: false, error: 'تعذر تحميل الدفعات، حاول مرة أخرى');
+      if (state.batches.isNotEmpty) {
+        state = state.copyWith(loading: false, error: null, offline: true);
+      } else {
+        state =
+            state.copyWith(loading: false, error: 'تعذر تحميل الدفعات، حاول مرة أخرى');
+      }
     }
   }
 
@@ -230,6 +277,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             slivers: [
               SliverToBoxAdapter(child: _hero(state)),
               SliverToBoxAdapter(child: _searchAndChips(context, state, controller)),
+              if (state.offline)
+                SliverToBoxAdapter(child: _offlineBanner()),
               if (staleError)
                 SliverToBoxAdapter(child: _errorBanner(context, state.error!, controller)),
               if (showSkeleton)
@@ -249,6 +298,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ─── شريط عدم الاتصال (نعرض بيانات محفوظة) ───
+
+  Widget _offlineBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF3D7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppPalette.gold),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_outlined,
+              size: 18, color: Color(0xFF92660A)),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'لا يوجد اتصال — تعرض نسخة محفوظة من الدفعات، سيتم التحديث تلقائيًا عند عودة الشبكة',
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF92660A)),
+            ),
+          ),
+        ],
       ),
     );
   }

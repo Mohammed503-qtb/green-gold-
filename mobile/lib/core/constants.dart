@@ -160,6 +160,7 @@ const Map<String, List<String>> kCan = {
   'manageDelivery': ['OWNER', 'MANAGER', 'STAFF', 'DELIVERY'],
   'viewReports': ['OWNER', 'MANAGER'],
   'viewAudit': ['OWNER', 'MANAGER'],
+  'manageSettings': ['OWNER'],
 };
 
 bool canRole(String? role, String permission) {

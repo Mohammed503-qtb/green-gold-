@@ -84,10 +84,13 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"
           } > key.properties
 
-      - name: بناء APK موقّع (للتثبيت المباشر)
+      - name: بناء APK موقّع (حزم مقسّمة حسب المعالج — أخف بكثير)
         run: |
           ARGS=""
           if [ -n "$API_BASE_URL" ]; then ARGS="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
+          # حزم منفصلة لكل معالج: حجم التنزيل أقل من الثلث
+          flutter build apk --release --split-per-abi $ARGS
+          # + الحزمة الشاملة (كل المعالجات) للتوافق الكامل
           flutter build apk --release $ARGS
 
       - name: بناء AAB موقّع (متجر Google Play)
@@ -100,7 +103,7 @@ jobs:
         working-directory: mobile
         run: |
           set -e
-          APK="build/app/outputs/flutter-apk/app-release.apk"
+          APK="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
           echo "── 1) فحص الصلاحيات ──"
           AAPT2=$(find /usr/local/lib/android/sdk/build-tools -name aapt2 | sort -V | tail -1)
           "$AAPT2" dump permissions "$APK" | tee /tmp/perms.txt
@@ -121,16 +124,26 @@ jobs:
 
       - name: تسمية الحزم
         run: |
-          mv build/app/outputs/flutter-apk/app-release.apk "GreenGold-${VERSION}-android.apk"
-          mv build/app/outputs/bundle/release/app-release.aab "GreenGold-${VERSION}-android.aab"
+          OUT=build/app/outputs
+          # الأساسية: arm64 (الأجهزة الحديثة) — أخف حزمة
+          cp "$OUT/flutter-apk/app-arm64-v8a-release.apk" "GreenGold-${VERSION}-android.apk"
+          # للأجهزة القديمة 32-بت
+          cp "$OUT/flutter-apk/app-armeabi-v7a-release.apk" "GreenGold-${VERSION}-android-armeabi.apk"
+          # الشاملة (كل المعالجات — الأكبر حجمًا)
+          cp "$OUT/flutter-apk/app-release.apk" "GreenGold-${VERSION}-android-full.apk"
+          # حزمة متجر Google Play
+          cp "$OUT/bundle/release/app-release.aab" "GreenGold-${VERSION}-android.aab"
+          ls -la "GreenGold-${VERSION}-"*
 
       - name: رفع مخرجات البناء
         uses: actions/upload-artifact@v4
         with:
           name: android-artifacts
           path: |
-            mobile/GreenGold-*-android.apk
-            mobile/GreenGold-*-android.aab
+            mobile/GreenGold-${{ env.VERSION }}-android.apk
+            mobile/GreenGold-${{ env.VERSION }}-android-armeabi.apk
+            mobile/GreenGold-${{ env.VERSION }}-android-full.apk
+            mobile/GreenGold-${{ env.VERSION }}-android.aab
           if-no-files-found: error
           retention-days: 7
 
@@ -255,24 +268,29 @@ jobs:
 
             | الملف | الاستخدام |
             |---|---|
-            | `GreenGold-${{ env.VERSION }}-android.apk` | تثبيت مباشر على أي جهاز Android — حمّله وافتحه (فعّل «التثبيت من مصادر غير معروفة») |
+            | `GreenGold-${{ env.VERSION }}-android.apk` | **الأفضل** — للأجهزة الحديثة (64-بت): أخف وأسرع تنزيلًا (~٢٠ ميجا) |
+            | `GreenGold-${{ env.VERSION }}-android-armeabi.apk` | للأجهزة القديمة 32-بت |
+            | `GreenGold-${{ env.VERSION }}-android-full.apk` | الشاملة — تعمل على كل الأجهزة (أكبر حجمًا) |
             | `GreenGold-${{ env.VERSION }}-android.aab` | رفع على متجر Google Play (Console → Production → Create release) |
             | `GreenGold-${{ env.VERSION }}-ios-unsigned.ipa` | يُوقَّع بحساب Apple Developer ثم الرفع عبر Transporter/TestFlight |
 
             ## ✨ ما الجديد
 
-            - الإصدار الأول: المتجر بالدفعات الحقيقية (صور وفيديو لكل دفعة)
-            - سلة مشتريات + شراء محمي (الخادم يعيد حساب الأسعار)
-            - دفع بإثبات (بنكي/محفظة/عند الاستلام) مع تحقق يدوي من الإدارة
-            - تتبع الطلب خطوة بخطوة + رمز OTP للتسليم
-            - تقييم مرتبط بالدفعات + إعادة الطلب بضغطة
-            - واتساب برقم الطلب + إدارة كاملة (لوحة/طلبات/دفعات/مخزون/توصيل/تقارير)
-            - إعدادات خادم مرنة عند أول تشغيل
+            - إصلاح زر المتابعة في إتمام الطلب — شريط تنقل ثابت مرئي دائمًا
+            - كاش محلي كامل: التطبيق يفتح فورًا ويعمل بلا إنترنت قوي (مناسب لشبكات اليمن الضعيفة)
+            - دخول الإدارة مخفي تمامًا عن المستخدمين — بطريقة دخول آمنة (نمط سري + PIN)
+            - إعداد الخادم من داخل الإدارة فقط — لا يظهر للمستخدم العادي
+            - حزم أخف: نسخة arm64 أقل من ثلث الحجم السابق
+            - المتجر بالدفعات الحقيقية + سلة + شراء محمي (الخادم يعيد حساب الأسعار)
+            - دفع بإثبات مع تحقق يدوي + تتبع خطوة بخطوة + رمز OTP للتسليم
+            - تقييم مرتبط بالدفعات + إعادة الطلب بضغطة + واتساب برقم الطلب
 
             ## 🔗 الخادم
 
-            التطبيق يتصل بخادم ذهب أخضر. عند أول تشغيل أدخل عنوان الخادم، أو ابنِ التطبيق بعنوان مضمّن:
-            `--dart-define=API_BASE_URL=https://your-server.com`
+            التطبيق يتصل بخادم ذهب أخضر. **الطريقة التجارية الصحيحة:** ابنِ التطبيق بعنوان مضمّن
+            `--dart-define=API_BASE_URL=https://your-server.com` (متغير `API_BASE_URL` في إعدادات المستودع
+            أو مدخل Run workflow) فيصل العملاء للمتجر مباشرة دون أي إعداد.
+            ويمكن للمالك أيضًا ضبط الخادم من داخل الإدارة (المزيد ← إعدادات الخادم).
 
             الباكند جاهز للنشر عبر Docker: `docker run -p 3000:3000 -v gg-data:/app/db ghcr.io/mohammed503-qtb/green-gold:latest`
 

@@ -13,6 +13,7 @@ import '../../core/theme.dart';
 import '../../services/admin_service.dart';
 import '../../state/staff.dart';
 import '../../shared/widgets.dart';
+import '../server_setup_screen.dart';
 import 'admin_shell.dart';
 
 class AdminLoginScreen extends ConsumerStatefulWidget {
@@ -125,23 +126,29 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // الشعار
-                  Container(
-                    width: 84,
-                    height: 84,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppPalette.gold.withValues(alpha: 0.45),
-                          blurRadius: 26,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                  // الشعار — مدخل إعداد الخادم المخفي (5 نقرات)
+                  // للإدارة عند تغيير عنوان الخادم أو إصلاح عنوان خاطئ
+                  SecretTapArea(
+                    onTriggered: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ServerSetupScreen()),
                     ),
-                    child: const Icon(Icons.grass_rounded,
-                        size: 46, color: AppPalette.green),
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppPalette.gold.withValues(alpha: 0.45),
+                            blurRadius: 26,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.grass_rounded,
+                          size: 46, color: AppPalette.green),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   const Text(

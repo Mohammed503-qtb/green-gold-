@@ -18,6 +18,7 @@ import 'admin_inventory_screen.dart';
 import 'admin_login_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_reports_screen.dart';
+import 'admin_server_settings.dart';
 import 'dashboard_screen.dart';
 
 class AdminShell extends ConsumerStatefulWidget {
@@ -136,6 +137,7 @@ class _AdminMoreScreen extends ConsumerWidget {
     final role = staff?.role;
     final canReports = canRole(role, 'viewReports');
     final canAudit = canRole(role, 'viewAudit');
+    final canSettings = canRole(role, 'manageSettings');
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -193,6 +195,15 @@ class _AdminMoreScreen extends ConsumerWidget {
             subtitle: 'سجل التدقيق — من فعل ماذا ومتى',
             onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AdminAuditScreen())),
+          ),
+        if (canSettings)
+          MoreTile(
+            icon: Icons.dns_rounded,
+            color: AppPalette.green,
+            title: 'إعدادات الخادم',
+            subtitle: 'عنوان خادم الـ API الذي يتصل به هذا الجهاز',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const AdminServerSettingsScreen())),
           ),
         const SizedBox(height: 8),
         Container(

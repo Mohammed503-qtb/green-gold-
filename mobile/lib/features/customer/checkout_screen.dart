@@ -132,7 +132,107 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             child: _buildStepBody(context, data),
           ),
         ),
+        // شريط التنقل الثابت — الزر الرئيسي مرئي دائمًا
+        // مهما كان موضع التمرير أو لوحة المفاتيح
+        _buildBottomNav(context, data),
       ],
+    );
+  }
+
+  // ───────── شريط التنقل السفلي الثابت ─────────
+
+  Widget _buildBottomNav(BuildContext context, CheckoutData data) {
+    final methods = data.methods;
+    final selectedId = _selectedMethodId(methods);
+
+    late final List<Widget> buttons;
+    switch (_step) {
+      case _kStepPay:
+        buttons = [
+          OutlinedButton(
+            onPressed: () => setState(() => _step = _kStepData),
+            child: const Text('رجوع'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: selectedId.isEmpty
+                  ? null
+                  : () => setState(() => _step = _kStepProof),
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('متابعة للإثبات',
+                  style: TextStyle(fontSize: 15.5)),
+            ),
+          ),
+        ];
+      case _kStepProof:
+        buttons = [
+          OutlinedButton(
+            onPressed: _submitting
+                ? null
+                : () => setState(() => _step = _kStepPay),
+            child: const Text('رجوع'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppPalette.gold,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _submitting ? null : _confirmOrder,
+              icon: _submitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle),
+              label: Text(_submitting ? 'جارٍ الإرسال…' : 'تأكيد الطلب',
+                  style: const TextStyle(fontSize: 15.5)),
+            ),
+          ),
+        ];
+      default: // _kStepData
+        buttons = [
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('رجوع'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _goStep2,
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('متابعة للدفع',
+                  style: TextStyle(fontSize: 15.5)),
+            ),
+          ),
+        ];
+    }
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade300, width: 1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(children: buttons),
+      ),
     );
   }
 
@@ -316,23 +416,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
         const SizedBox(height: 14),
         _summaryCard(context, data),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('رجوع'),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton(
-                onPressed: _goStep2,
-                child: const Text('متابعة للدفع',
-                    style: TextStyle(fontSize: 15.5)),
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -394,25 +478,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
         const SizedBox(height: 14),
         _summaryCard(context, data),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            OutlinedButton(
-              onPressed: () => setState(() => _step = _kStepData),
-              child: const Text('رجوع'),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton(
-                onPressed: selectedId.isEmpty
-                    ? null
-                    : () => setState(() => _step = _kStepProof),
-                child:
-                    const Text('متابعة', style: TextStyle(fontSize: 15.5)),
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -505,37 +571,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ],
         const SizedBox(height: 14),
         _summaryCard(context, data),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            OutlinedButton(
-              onPressed:
-                  _submitting ? null : () => setState(() => _step = _kStepPay),
-              child: const Text('رجوع'),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppPalette.gold,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: _submitting ? null : _confirmOrder,
-                child: _submitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('تأكيد الطلب',
-                        style: TextStyle(fontSize: 15.5)),
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: 16),
       ],
     );
   }

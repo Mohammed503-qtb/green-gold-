@@ -31,9 +31,11 @@ class ApiClient {
     String? staffPin,
   }) : dio = Dio(BaseOptions(
           baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 25),
-          sendTimeout: const Duration(seconds: 25),
+          // مهلات قصيرة نسبيًا: على الشبكة الضعيفة نفشل سريعًا
+          // ونعرض النسخة المحفوظة بدل انتظار طويل
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
           responseType: ResponseType.json,
           headers: {
             'Content-Type': 'application/json',

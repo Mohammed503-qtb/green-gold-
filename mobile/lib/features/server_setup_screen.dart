@@ -1,6 +1,9 @@
 // ============================================================
-// GREEN GOLD | شاشة إعداد الخادم (أول تشغيل)
-// تُعرض عند عدم ضبط عنوان الـ API — تسمح بالاختبار والحفظ
+// GREEN GOLD | شاشة إعداد الخادم — للإدارة فقط
+// ------------------------------------------------------------
+// لا تظهر للمستخدم العادي: تُفتح عبر النقر السري
+// (5 نقرات على شعار بوابة الاتصال أو شاشة دخول الإدارة)
+// أو عند أول تشغيل بواسطة من يجهّز الجهاز.
 // ============================================================
 
 import 'package:flutter/material.dart';
@@ -8,8 +11,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
 import '../core/theme.dart';
+import '../services/api_cache.dart';
 import '../services/api_provider.dart';
 import '../state/config.dart';
+import 'customer/customer_helpers.dart';
+import 'customer/home_screen.dart';
 
 class ServerSetupScreen extends ConsumerStatefulWidget {
   const ServerSetupScreen({super.key});
@@ -89,8 +95,14 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
     }
     await ref.read(appConfigProvider.notifier).setBaseUrl(url);
     if (mounted) {
-      // إجبار إعادة بناء عميل الـ API بالعنوان الجديد
+      // إعادة بناء كل مزوّدات البيانات بالعنوان الجديد
+      // + تفريغ الكاش (بيانات متجر آخر لا تصلح)
+      ApiCache.I.resetMemory();
       ref.invalidate(apiClientProvider);
+      ref.invalidate(publicSettingsProvider);
+      ref.invalidate(checkoutDataProvider);
+      ref.invalidate(homeCatalogProvider);
+      Navigator.of(context).maybePop();
     }
   }
 
@@ -225,7 +237,7 @@ class _ServerSetupScreenState extends ConsumerState<ServerSetupScreen> {
                   ),
                   const SizedBox(height: 18),
                   const Text(
-                    'الإصدار 1.0.1 — ذهب أخضر للتجارة',
+                    'الإصدار 1.0.2 — ذهب أخضر للتجارة',
                     style: TextStyle(color: Color(0xFF7B9C87), fontSize: 12),
                   ),
                 ],
